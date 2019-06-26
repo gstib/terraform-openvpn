@@ -7,7 +7,7 @@ variable "aws_region" {
 }
 
 variable "ssh_remote_user" {
-  default = "docker"
+  default = "ec2-user"
 }
 
 variable "ssh_public_key_path" {
@@ -78,8 +78,8 @@ resource "aws_security_group" "outgoing" {
 }
 
 resource "aws_instance" "vpn" {
-  instance_type = "t2.micro"
-  ami           = "ami-633ba70c"
+  instance_type = "t2.small"
+  ami           = "ami-0cc293023f983ed53"
 
   vpc_security_group_ids = [
     "${aws_security_group.vpn.id}",
@@ -96,12 +96,17 @@ resource "aws_instance" "vpn" {
 
   provisioner "remote-exec" {
     inline = [
-      "docker volume create --name ${var.vpn_data}",
-      "docker run -v ${var.vpn_data}:/etc/openvpn --rm kylemanna/openvpn ovpn_genconfig -u udp://${aws_instance.vpn.public_dns}",
-      "yes 'yes' | docker run -v ${var.vpn_data}:/etc/openvpn --rm -i kylemanna/openvpn ovpn_initpki nopass",
-      "docker run -v ${var.vpn_data}:/etc/openvpn -d -p ${var.vpn_port}:${var.vpn_port}/udp --cap-add=NET_ADMIN kylemanna/openvpn",
-      "docker run -v ${var.vpn_data}:/etc/openvpn --rm -it kylemanna/openvpn easyrsa build-client-full ${var.vpn_client_name} nopass",
-      "docker run -v ${var.vpn_data}:/etc/openvpn --rm kylemanna/openvpn ovpn_getclient ${var.vpn_client_name} > ~/${var.vpn_client_name}.ovpn",
+      "sudo yum update -y",
+      "sudo amazon-linux-extras install -y docker",
+      "sudo service docker start",
+      "sleep 10",
+      "sudo usermod -a -G docker ec2-user",
+      "sudo docker volume create --name ${var.vpn_data}",
+      "sudo docker run -v ${var.vpn_data}:/etc/openvpn --rm kylemanna/openvpn ovpn_genconfig -u udp://${aws_instance.vpn.public_dns}",
+      "yes 'yes' | sudo docker run -v ${var.vpn_data}:/etc/openvpn --rm -i kylemanna/openvpn ovpn_initpki nopass",
+      "sudo docker run -v ${var.vpn_data}:/etc/openvpn -d -p ${var.vpn_port}:${var.vpn_port}/udp --cap-add=NET_ADMIN kylemanna/openvpn",
+      "sudo docker run -v ${var.vpn_data}:/etc/openvpn --rm -it kylemanna/openvpn easyrsa build-client-full ${var.vpn_client_name} nopass",
+      "sudo docker run -v ${var.vpn_data}:/etc/openvpn --rm kylemanna/openvpn ovpn_getclient ${var.vpn_client_name} > ~/${var.vpn_client_name}.ovpn",
     ]
   }
 
